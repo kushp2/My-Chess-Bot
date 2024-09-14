@@ -1,38 +1,90 @@
 import chess
+import chess.svg
+import os
 import sys
-from PyQt5.QtWidgets import QApplication 
-from board import create_window
 from bot import get_random_move
+from PyQt5.QtSvg import QSvgWidget
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QSpacerItem, QSizePolicy
 
-def game_loop(window):
-    '''Game loop function'''
-    board = window.get_board()
+# Sets the environment, PyQt5 did not work on my machine
+os.environ["QT_QPA_PLATFORM"] = "xcb"
 
-    while not board.is_game_over():
-        # If it's white's turn (the bot)
-        if board.turn == chess.WHITE:
-            move = get_random_move(board)
-            print(f"Kush Bot plays: {move}")
-        else:
-            move = None
-            while move not in board.legal_moves:
-                try:
-                    move_input = input("Enter your move: ")
-                    move = chess.Move.from_uci(move_input)
-                except:
-                    print("Invalid move format. Use UCI format (e.g., e2e4)")
-            print(f"You play: {move}")
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
 
-        # Apply the move to the board
-        window.apply_move(move.uci())
+        # Sets up window
+        self.setGeometry(80, 80, 880, 880)
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
 
-    print("Game Over!")
-    print("Result: ", board.result())
+        # Sets up QSvgWidget to display the chessboard
+        self.widgetSvg = QSvgWidget(parent=self)
+        self.layout.addWidget(self.widgetSvg)
+        self.layout.setStretch(0, 1)
 
+        # Set up text input and submit button
+        self.bottom_layout = QVBoxLayout()
+        self.move_input = QLineEdit(self)
+        self.move_input.setPlaceholderText("Enter your move (e.g., e2e4)")
+        self.bottom_layout.addWidget(self.move_input)
+        
+        self.submit_button = QPushButton("Submit Move", self)
+        self.submit_button.clicked.connect(self.user_move_button)
+        self.bottom_layout.addWidget(self.submit_button)
 
+        self.status_label = QLabel("", self)
+        self.bottom_layout.addWidget(self.status_label)
+
+        # Add bottom layout to the main layout
+        self.layout.addLayout(self.bottom_layout)
+        
+        # Add stretch to make sure the bottom layout sticks to the bottom
+        self.layout.setStretch(1, 0)
+
+        # Initializes the chessboard
+        self.chessboard = chess.Board()
+        self.process_bot_move()
+        self.update_board()
+
+    def update_board(self):
+        '''Renders the chess board'''
+        chessboardSvg = chess.svg.board(self.chessboard, flipped=True).encode("UTF-8")
+        self.widgetSvg.load(chessboardSvg)
+
+    def apply_move(self, move_uci):
+        '''Applies a move to the board'''
+        try:
+            move = chess.Move.from_uci(move_uci)
+            if move in self.chessboard.legal_moves:
+                self.chessboard.push(move)
+                self.update_board()
+                return True
+            else:
+                self.status_label.setText("Invalid move. Try again.")
+                return False
+        except Exception as e:
+            self.status_label.setText(f"Error applying move: {e}")
+            return False
+
+    def user_move_button(self):
+        '''Handles the move input from the user'''
+        if self.chessboard.turn == chess.BLACK and not self.chessboard.is_game_over():
+            move_input = self.move_input.text()
+            if self.apply_move(move_input):
+                print(f"You played: {move_input}")
+                self.move_input.clear()
+                self.process_bot_move()
+
+    def process_bot_move(self):
+        '''Processes the bot's move if it's the bot's turn'''
+        if self.chessboard.turn == chess.WHITE and not self.chessboard.is_game_over():
+            move = get_random_move(self.chessboard)
+            print(f"Kush_Bot played: {move}")
+            self.apply_move(move.uci())
 
 if __name__ == "__main__":
-    window, app = create_window()
-    game_loop(window)
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
     sys.exit(app.exec_())
-    quit()
