@@ -1,0 +1,6 @@
+/venv/
+/python/__pycache__
+/repo/
+.env
+/game_data/dataset.npy
+/game_data/label_encoder.pkl
